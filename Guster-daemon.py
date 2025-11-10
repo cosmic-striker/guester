@@ -44,6 +44,80 @@ except Exception:
 CONFIG_PATH = Path.home() / ".config" / "guster" / "config.yml"
 CONFIG_DIR = CONFIG_PATH.parent
 
+def detect_desktop_environment():
+    """Detect the current desktop environment."""
+    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+    session = os.environ.get('DESKTOP_SESSION', '').lower()
+    
+    if 'gnome' in desktop or 'gnome' in session:
+        return 'gnome'
+    elif 'kde' in desktop or 'plasma' in session:
+        return 'kde'
+    elif 'xfce' in desktop or 'xfce' in session:
+        return 'xfce'
+    elif 'i3' in session:
+        return 'i3'
+    elif 'cinnamon' in desktop or 'cinnamon' in session:
+        return 'cinnamon'
+    elif 'mate' in desktop or 'mate' in session:
+        return 'mate'
+    else:
+        return 'unknown'
+
+def get_default_gestures(de):
+    """Get default gestures based on desktop environment."""
+    base_gestures = {
+        '3_left': 'xdotool key Alt+Left',  # Browser back
+        '3_right': 'xdotool key Alt+Right',  # Browser forward
+        '3_up': 'xdotool key Ctrl+Page_Up',  # Previous tab
+        '3_down': 'xdotool key Ctrl+Page_Down',  # Next tab
+    }
+    
+    if de == 'gnome':
+        # GNOME specific commands
+        gestures = base_gestures.copy()
+        gestures.update({
+            '4_left': 'dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:"Main.overview.show();" || xdotool key Super+Left',  # Switch to left workspace or overview
+            '4_right': 'dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:"Main.overview.show();" || xdotool key Super+Right',  # Switch to right workspace or overview
+            '4_up': 'xdotool key Super+d',  # Show desktop
+            '4_down': 'xdotool key Super+s',  # Show overview
+        })
+    elif de == 'kde':
+        gestures = base_gestures.copy()
+        gestures.update({
+            '4_left': 'qdbus org.kde.kglobalaccel /component/kwin invokeShortcut "Switch One Desktop to the Left"',  # Switch desktop left
+            '4_right': 'qdbus org.kde.kglobalaccel /component/kwin invokeShortcut "Switch One Desktop to the Right"',  # Switch desktop right
+            '4_up': 'qdbus org.kde.kglobalaccel /component/kwin invokeShortcut "Show Desktop"',  # Show desktop
+            '4_down': 'qdbus org.kde.kglobalaccel /component/kwin invokeShortcut "Window Operations Menu"',  # Window operations
+        })
+    elif de == 'i3':
+        gestures = base_gestures.copy()
+        gestures.update({
+            '4_left': 'i3-msg workspace prev',  # Previous workspace
+            '4_right': 'i3-msg workspace next',  # Next workspace
+            '4_up': 'i3-msg exec "rofi -show run"',  # Run launcher
+            '4_down': 'i3-msg exec "rofi -show window"',  # Window switcher
+        })
+    elif de == 'xfce':
+        gestures = base_gestures.copy()
+        gestures.update({
+            '4_left': 'xfce4-panel --plugin-event=genmon:next:bool',  # May need adjustment
+            '4_right': 'xfce4-panel --plugin-event=genmon:prev:bool',  # May need adjustment
+            '4_up': 'xdotool key Super+d',  # Show desktop
+            '4_down': 'xfce4-appfinder',  # App finder
+        })
+    else:
+        # Fallback to generic X11 commands
+        gestures = base_gestures.copy()
+        gestures.update({
+            '4_left': 'wmctrl -s $(($(wmctrl -d | grep "*" | cut -d" " -f1) - 1))',  # Previous desktop
+            '4_right': 'wmctrl -s $(($(wmctrl -d | grep "*" | cut -d" " -f1) + 1))',  # Next desktop
+            '4_up': 'xdotool key Super+d',  # Show desktop
+            '4_down': 'xdotool key Super',  # Open menu
+        })
+    
+    return gestures
+
 CONFIG_DEFAULT = {
     'threshold': {
         # minimum absolute motion (units depend on libinput output; tune this)
@@ -51,15 +125,7 @@ CONFIG_DEFAULT = {
         # minimum ratio to consider primary axis movement
         'axis_ratio': 1.5,
     },
-    'gestures': {
-        # format: "<fingers>_<dir>": command
-        '3_left': 'xdotool key ctrl+Page_Up',
-        '3_right': 'xdotool key ctrl+Page_Down',
-        '4_left': 'wmctrl -s $(($(wmctrl -d | grep "\*" | cut -d" " -f1) - 1))',
-        '4_right': 'wmctrl -s $(($(wmctrl -d | grep "\*" | cut -d" " -f1) + 1))',
-        '4_up': 'xdotool key Super',
-        '4_down': 'xdotool key Super',
-    }
+    'gestures': {}  # Will be set dynamically
 }
 
 LINE_RE_GESTURE_BEGIN = re.compile(r'GESTURE_SWIPE_BEGIN.*n_fingers\s*(\d+)')
@@ -73,7 +139,7 @@ class GestureCollector:
         self.config = config
 
     def reset(self):
-        with getattr(self, 'lock', threading.Lock()):
+        with self.lock:
             self.active = False
             self.fingers = 0
             self.total_dx = 0.0
@@ -114,18 +180,25 @@ def load_or_create_config():
     if not CONFIG_DIR.exists():
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if not CONFIG_PATH.exists():
+        de = detect_desktop_environment()
+        default_config = CONFIG_DEFAULT.copy()
+        default_config['gestures'] = get_default_gestures(de)
         with open(CONFIG_PATH, 'w') as fp:
-            yaml.safe_dump(CONFIG_DEFAULT, fp)
-        print(f"Created default config at {CONFIG_PATH}. Edit to customize gestures.")
+            yaml.safe_dump(default_config, fp)
+        print(f"Created default config at {CONFIG_PATH} for desktop environment: {de}. Edit to customize gestures.")
     with open(CONFIG_PATH, 'r') as fp:
         cfg = yaml.safe_load(fp) or {}
     # merge defaults for safety
     merged = CONFIG_DEFAULT.copy()
     merged.update(cfg)
     # deep merge gestures
-    merged['gestures'] = CONFIG_DEFAULT['gestures'].copy()
-    user_g = cfg.get('gestures', {})
-    merged['gestures'].update(user_g)
+    if not merged['gestures']:
+        merged['gestures'] = get_default_gestures(detect_desktop_environment())
+    else:
+        default_g = get_default_gestures(detect_desktop_environment())
+        for key in default_g:
+            if key not in merged['gestures']:
+                merged['gestures'][key] = default_g[key]
     # threshold
     merged['threshold'] = CONFIG_DEFAULT['threshold'].copy()
     merged['threshold'].update(cfg.get('threshold', {}))
@@ -223,10 +296,14 @@ if __name__ == '__main__':
 #   px_min: 50.0
 #   axis_ratio: 1.5
 # gestures:
-#   3_left: "xdotool key ctrl+Page_Up"
-#   3_right: "xdotool key ctrl+Page_Down"
-#   4_left: "wmctrl -s $(($(wmctrl -d | grep '\*' | cut -d' ' -f1) - 1))"
-#   4_right: "wmctrl -s $(($(wmctrl -d | grep '\*' | cut -d' ' -f1) + 1))"
+#   3_left: "xdotool key Alt+Left"
+#   3_right: "xdotool key Alt+Right"
+#   3_up: "xdotool key Ctrl+Page_Up"
+#   3_down: "xdotool key Ctrl+Page_Down"
+#   4_left: "dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.overview.show();'"
+#   4_right: "dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.overview.show();'"
+#   4_up: "xdotool key Super+d"
+#   4_down: "xdotool key Super+s"
 
 # ---------------------------
 # Quick systemd unit example (save to /etc/systemd/system/guster.service)
@@ -263,4 +340,4 @@ if __name__ == '__main__':
 #     sudo libinput debug-events --verbose
 # - Tune px_min in the config to be smaller/larger depending on sensitivity.
 # - For Wayland (GNOME) the approach may require different hooks (libinput still works
-#   if you can access the seat debug-events)."
+#   if you can access the seat debug-events).
