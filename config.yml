@@ -1,0 +1,18 @@
+# Sample Guster Gesture Daemon Configuration
+# This is an example config file. The daemon will create a default one based on your desktop environment.
+# Copy this to ~/.config/guster/config.yml and modify as needed.
+
+threshold:
+  px_min: 50.0      # Minimum pixels moved to count as a swipe
+  axis_ratio: 1.5   # Ratio to consider movement horizontal vs vertical
+
+gestures:
+  3_left: "xdotool key Alt+Left"        # Browser back
+  3_right: "xdotool key Alt+Right"      # Browser forward
+  3_up: "xdotool key Ctrl+Page_Up"      # Previous tab
+  3_down: "xdotool key Ctrl+Page_Down"  # Next tab
+
+  4_left: "wmctrl -s $(($(wmctrl -d | grep '*' | cut -d' ' -f1) - 1))"  # Previous workspace
+  4_right: "wmctrl -s $(($(wmctrl -d | grep '*' | cut -d' ' -f1) + 1))" # Next workspace
+  4_up: "xdotool key Super+d"           # Show desktop
+  4_down: "xdotool key Super"           # Open start menu
