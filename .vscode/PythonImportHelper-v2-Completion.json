@@ -1,0 +1,190 @@
+[
+    {
+        "label": "subprocess",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "subprocess",
+        "description": "subprocess",
+        "detail": "subprocess",
+        "documentation": {}
+    },
+    {
+        "label": "threading",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "threading",
+        "description": "threading",
+        "detail": "threading",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "sys",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sys",
+        "description": "sys",
+        "detail": "sys",
+        "documentation": {}
+    },
+    {
+        "label": "shlex",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "shlex",
+        "description": "shlex",
+        "detail": "shlex",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "GestureCollector",
+        "kind": 6,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "class GestureCollector:\n    def __init__(self, config):\n        self.lock = threading.Lock()\n        self.reset()\n        self.config = config\n    def reset(self):\n        with self.lock:\n            self.active = False\n            self.fingers = 0\n            self.total_dx = 0.0",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "detect_desktop_environment",
+        "kind": 2,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "def detect_desktop_environment():\n    \"\"\"Detect the current desktop environment.\"\"\"\n    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()\n    session = os.environ.get('DESKTOP_SESSION', '').lower()\n    if 'gnome' in desktop or 'gnome' in session:\n        return 'gnome'\n    elif 'kde' in desktop or 'plasma' in session:\n        return 'kde'\n    elif 'xfce' in desktop or 'xfce' in session:\n        return 'xfce'",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "get_default_gestures",
+        "kind": 2,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "def get_default_gestures(de):\n    \"\"\"Get default gestures based on desktop environment.\"\"\"\n    base_gestures = {\n        '3_left': 'xdotool key Alt+Left',  # Browser back\n        '3_right': 'xdotool key Alt+Right',  # Browser forward\n        '3_up': 'xdotool key Ctrl+Page_Up',  # Previous tab\n        '3_down': 'xdotool key Ctrl+Page_Down',  # Next tab\n    }\n    if de == 'gnome':\n        # GNOME specific commands",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "load_or_create_config",
+        "kind": 2,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "def load_or_create_config():\n    if not CONFIG_DIR.exists():\n        CONFIG_DIR.mkdir(parents=True, exist_ok=True)\n    if not CONFIG_PATH.exists():\n        de = detect_desktop_environment()\n        default_config = CONFIG_DEFAULT.copy()\n        default_config['gestures'] = get_default_gestures(de)\n        with open(CONFIG_PATH, 'w') as fp:\n            yaml.safe_dump(default_config, fp)\n        print(f\"Created default config at {CONFIG_PATH} for desktop environment: {de}. Edit to customize gestures.\")",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "determine_direction",
+        "kind": 2,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "def determine_direction(dx, dy, threshold):\n    ax = abs(dx)\n    ay = abs(dy)\n    if max(ax, ay) < threshold['px_min']:\n        return None\n    if ax >= ay * threshold['axis_ratio']:\n        return 'right' if dx > 0 else 'left'\n    if ay >= ax * threshold['axis_ratio']:\n        return 'down' if dy > 0 else 'up'\n    return None",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "execute_action",
+        "kind": 2,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "def execute_action(command, dry_run=False):\n    if not command:\n        return\n    if dry_run:\n        print(f\"[guster] would execute: {command}\")\n        return\n    try:\n        # Use shell=true because commands may use shell features; in prod prefer safer approach\n        subprocess.Popen(command, shell=True)\n        print(f\"[guster] executed: {command}\")",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "run_daemon",
+        "kind": 2,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "def run_daemon(dry_run=False):\n    cfg = load_or_create_config()\n    collector = GestureCollector(cfg)\n    # Start libinput debug-events process\n    proc = subprocess.Popen(['libinput', 'debug-events'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)\n    print('[guster] listening to libinput debug-events...')\n    try:\n        for raw_line in proc.stdout:\n            line = raw_line.strip()\n            # quick debug printing (comment out for quiet mode)",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "CONFIG_PATH",
+        "kind": 5,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "CONFIG_PATH = Path.home() / \".config\" / \"guster\" / \"config.yml\"\nCONFIG_DIR = CONFIG_PATH.parent\ndef detect_desktop_environment():\n    \"\"\"Detect the current desktop environment.\"\"\"\n    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()\n    session = os.environ.get('DESKTOP_SESSION', '').lower()\n    if 'gnome' in desktop or 'gnome' in session:\n        return 'gnome'\n    elif 'kde' in desktop or 'plasma' in session:\n        return 'kde'",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "CONFIG_DIR",
+        "kind": 5,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "CONFIG_DIR = CONFIG_PATH.parent\ndef detect_desktop_environment():\n    \"\"\"Detect the current desktop environment.\"\"\"\n    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()\n    session = os.environ.get('DESKTOP_SESSION', '').lower()\n    if 'gnome' in desktop or 'gnome' in session:\n        return 'gnome'\n    elif 'kde' in desktop or 'plasma' in session:\n        return 'kde'\n    elif 'xfce' in desktop or 'xfce' in session:",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "CONFIG_DEFAULT",
+        "kind": 5,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "CONFIG_DEFAULT = {\n    'threshold': {\n        # minimum absolute motion (units depend on libinput output; tune this)\n        'px_min': 50.0,\n        # minimum ratio to consider primary axis movement\n        'axis_ratio': 1.5,\n    },\n    'gestures': {}  # Will be set dynamically\n}\nLINE_RE_GESTURE_BEGIN = re.compile(r'GESTURE_SWIPE_BEGIN.*n_fingers\\s*(\\d+)')",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "LINE_RE_GESTURE_BEGIN",
+        "kind": 5,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "LINE_RE_GESTURE_BEGIN = re.compile(r'GESTURE_SWIPE_BEGIN.*n_fingers\\s*(\\d+)')\nLINE_RE_GESTURE_UPDATE = re.compile(r'GESTURE_SWIPE_UPDATE.*delta\\s*([\\-0-9\\.]+)\\s*([\\-0-9\\.]+)')\nLINE_RE_GESTURE_END = re.compile(r'GESTURE_SWIPE_END.*n_fingers\\s*(\\d+)')\nclass GestureCollector:\n    def __init__(self, config):\n        self.lock = threading.Lock()\n        self.reset()\n        self.config = config\n    def reset(self):\n        with self.lock:",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "LINE_RE_GESTURE_UPDATE",
+        "kind": 5,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "LINE_RE_GESTURE_UPDATE = re.compile(r'GESTURE_SWIPE_UPDATE.*delta\\s*([\\-0-9\\.]+)\\s*([\\-0-9\\.]+)')\nLINE_RE_GESTURE_END = re.compile(r'GESTURE_SWIPE_END.*n_fingers\\s*(\\d+)')\nclass GestureCollector:\n    def __init__(self, config):\n        self.lock = threading.Lock()\n        self.reset()\n        self.config = config\n    def reset(self):\n        with self.lock:\n            self.active = False",
+        "detail": "guster-daemon",
+        "documentation": {}
+    },
+    {
+        "label": "LINE_RE_GESTURE_END",
+        "kind": 5,
+        "importPath": "guster-daemon",
+        "description": "guster-daemon",
+        "peekOfCode": "LINE_RE_GESTURE_END = re.compile(r'GESTURE_SWIPE_END.*n_fingers\\s*(\\d+)')\nclass GestureCollector:\n    def __init__(self, config):\n        self.lock = threading.Lock()\n        self.reset()\n        self.config = config\n    def reset(self):\n        with self.lock:\n            self.active = False\n            self.fingers = 0",
+        "detail": "guster-daemon",
+        "documentation": {}
+    }
+]
