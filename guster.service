@@ -1,0 +1,12 @@
+[Unit]
+Description=Guster Gesture Daemon
+After=graphical.target
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+ExecStart=/usr/local/bin/guster-daemon.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
